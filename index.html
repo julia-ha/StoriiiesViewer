@@ -1,31 +1,24 @@
-<!doctype html>
+
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="/src/css/styles.css" />
-    <style>
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-      }
-    </style>
-    <script type="module">
-      import StoriiiesViewer from "/src/StoriiiesViewer.ts";
-      document.addEventListener("DOMContentLoaded", () => {
-        const container = document.querySelector("#viewer");
+	<!-- ... -->
+	<link rel="stylesheet" href="https://unpkg.com/@cogapp/storiiies-viewer@latest/dist/storiiies-viewer.css">
+	<script src="./dist/umd/storiiies-viewer.js"></script>
 
-        window.storiiiesViewerInstance = new StoriiiesViewer({
-          container,
-          manifestUrl:
-            "http://localhost:43110/manifests/standard-v3/manifest.json",
-        });
-      });
-    </script>
+    <!-- <link rel="stylesheet" href="/src/css/styles.css" />-->
     <title>Demo</title>
   </head>
-  <body>
-    <div id="viewer"></div>
-  </body>
+
+  <div id="viewer"></div>
+  <script>
+	//import StoriiiesViewer from "/src/StoriiiesViewer.ts";
+	document.addEventListener("DOMContentLoaded", () => {
+	  //const container = document.querySelector("#viewer");
+
+	  const myViewer = new StoriiiesViewer({
+		container: "#viewer",
+		manifestUrl: "https://ids.si.edu/ids/manifest/CHSDM-B3F79179F6E22-000001",
+	  });
+	});
+  </script>
 </html>
