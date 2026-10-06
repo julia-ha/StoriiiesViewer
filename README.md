@@ -82,6 +82,24 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 ```
 
+### Image previews
+
+When a manifest has more than one image, a column of small previews appears on the right hand side of the viewer. Clicking one jumps straight to the start of that image's part of the story, without clicking through the annotations in between. The preview of the image currently being viewed is highlighted. They're also keyboard accessible, as a labelled group of buttons.
+
+Each preview uses the canvas's own `thumbnail` if it has one (v3 `thumbnail`, or v2 `thumbnail`). Otherwise it's requested from the canvas's IIIF image service, at the smallest size the service says it offers (from its `info.json`) that's at least 160px wide, so image services that only support a fixed set of sizes work too.
+
+Previews are never shown for a manifest with one image. To turn them off for manifests with several, pass the `showThumbnails` option:
+
+```js
+const myViewer = new StoriiiesViewer({
+  container: "#storiiies-viewer",
+  manifestUrl: "https://path-to-your-storiiies-manifest",
+  showThumbnails: false, // Defaults to true
+});
+```
+
+The size of the previews and the space between them can be changed with the `--storiiies-viewer-thumbnail-size` and `--storiiies-viewer-thumbnail-gap` custom properties. On narrow viewers the previews are shown at 75% of this size.
+
 ### Using a custom "point of interest" SVG
 
 You may provide a custom SVG graphic to use with points of interest.
@@ -102,11 +120,15 @@ The default colour and highlighting on activation and hover of points of interes
 
 ## Supported manifest formats
 
-StoriiiesViewer supports a subset of the [IIIF presentation API v3](https://iiif.io/api/presentation/3.0/). Specifically, we target `annotationPages` which are included directly in the manifest ([like in this cookbook recipe](https://iiif.io/api/cookbook/recipe/0258-tagging-external-resource/)).
+StoriiiesViewer supports a subset of the [IIIF presentation API v3](https://iiif.io/api/presentation/3.0/). Specifically, we target `annotationPages` which are included directly in the manifest ([like in this cookbook recipe](https://iiif.io/api/cookbook/recipe/0258-tagging-external-resource/)), or which are referenced from the manifest and fetched ([as shown in this cookbook recipe](https://iiif.io/api/cookbook/recipe/0306-linking-annotations-to-manifests/)).
+
+[Presentation API v2](https://iiif.io/api/presentation/2.1/) manifests are also supported, by converting them to the v3 shape as they're read. See [Presentation API v2 manifests](#presentation-api-v2-manifests) below.
 
 Text based annotations can either be `text/plain` or `text/html` denoted by the `format` field. For `text/plain` newline characters will be converted and output as `<br>` tags.
 
 Support for audio exists, and StoriiiesViewer will render an `<audio />` element for annotations that have a type of `Sound`, and which are structured [like shown in this cookbook recipe](https://iiif.io/api/cookbook/recipe/0002-mvm-audio/).
+
+Multiple images are supported. Each `Canvas` in the manifest's `items` is shown as its own image, with its own `annotations`, in the order they appear. The story runs through the title slide, then each image's annotations in turn, and finally the credit slide. When moving between images the viewer loads the next image and returns to a view of the whole of it. Previews of the images are shown so that it's easy to jump between them (see [Image previews](#image-previews)). Images after the first get an intro slide showing the whole image if the canvas has a `label` (which is shown as a heading), or if it has no annotations (so it would otherwise be skipped; a fallback heading of "Image *n*" is used if there's no label). Canvases without an IIIF image service can't be displayed, so are skipped with a console warning.
 
 Points of interest (markers that target a single point, rather than a region), can be rendered by using a `target` with a type of `specificResource` and a `selector` of `type: "pointSelector"`. See this [cookbook recipe for an example](https://iiif.io/api/cookbook/recipe/0135-annotating-point-in-canvas/).
 
@@ -119,14 +141,32 @@ StoriiiesViewer has no required fields (aside from those required by the present
 > [!NOTE]<br>
 > Certain features which aren't currently supported include:
 >
-> - Externally referenced `annotationPages` ([as shown in this cookbook recipe](https://iiif.io/api/cookbook/recipe/0306-linking-annotations-to-manifests/))
-> - Multiple images
 > - Full multi-lingual support
 >
-> However, pathways exist to enable these features with further development.
+> However, pathways exist to enable this feature with further development.
 
 > [!WARNING]<br>
-> Manifest with a version lower than 3 may load images, but aren't guaranteed to work beyond this, and will display a warning in the console.
+> Manifests that aren't Presentation API v2 or v3 may load images, but aren't guaranteed to work beyond this, and will display a warning in the console.
+
+### External annotation pages
+
+An `annotationPage` that only has an `id` (no `items`) is fetched, and its annotations are shown in place. Relative URLs are resolved against the manifest's URL. The server must allow cross-origin requests if it's on a different origin to your page. If a page can't be fetched, or isn't an annotation page, a warning is logged, the container's `data-status` attribute includes `ext-anno-err`, and the page is skipped.
+
+### Presentation API v2 manifests
+
+Presentation API v2 manifests are converted as they're read, so these are all handled:
+
+- Images via the canvas's image service
+- A manifest `label`, `description` (used as the summary), and `attribution` (used as the required statement), and canvas `label`s
+- Annotation lists in a canvas's `otherContent`, either embedded (with `resources`) or referenced by URL and fetched
+- Text annotations (`cnt:ContentAsText`, using `chars` and `format`) and audio annotations
+- Annotation targets (`on`) given as a canvas URI with an optional `#xywh=` fragment, or an `oa:SpecificResource` with an `oa:FragmentSelector`
+
+What v2 can't express, or isn't converted:
+
+- Points of interest, as v2 has no standard equivalent. Use a region target instead
+- Other kinds of selector (e.g. `oa:SvgSelector`). The annotation is treated as targeting the whole canvas
+- Annotation bodies that aren't text or audio. These are ignored
 
 ### Compatibility with Storiiies Editor
 
