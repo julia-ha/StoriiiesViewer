@@ -154,6 +154,26 @@ describe("Errors", () => {
 
 describe("Warnings", () => {
   it("Should warn if the manifest looks like it isn't supported", () => {
+    // Anything other than Presentation API v2 or v3
+    cy.fixture("/manifests/standard-v3/manifest.json").then((manifest) => {
+      cy.intercept("GET", "/manifests/standard-v3/manifest.json", {
+        body: {
+          ...manifest,
+          "@context": "http://iiif.io/api/presentation/1/context.json",
+        },
+      }).as("v1-manifest");
+    });
+
+    setupViewer();
+
+    cy.wait("@v1-manifest");
+
+    cy.get("#viewer")
+      .should("have.attr", "data-status")
+      .and("match", /unkn-version/);
+  });
+
+  it("Should not warn about the version of a v2 manifest", () => {
     cy.intercept("GET", "/manifests/standard-v3/manifest.json", {
       fixture: "/manifests/standard-v2/manifest.json",
     }).as("v2-manifest");
@@ -162,9 +182,9 @@ describe("Warnings", () => {
 
     cy.wait("@v2-manifest");
 
-    cy.get("#viewer")
-      .should("have.attr", "data-status")
-      .and("match", /unkn-version/);
+    cy.get('#viewer[data-loaded="true"]').should(($el) => {
+      expect($el.attr("data-status") ?? "").not.to.match(/unkn-version/);
+    });
   });
 
   it("Should warn if the manifest doesn't contain a label", () => {
@@ -181,19 +201,43 @@ describe("Warnings", () => {
       .and("match", /no-label/);
   });
 
-  it("Should warn if the manifest contains external annotation pages", () => {
+  it("Should warn if an external annotation page can't be fetched", () => {
     cy.intercept("GET", "/manifests/standard-v3/manifest.json", {
       fixture: "/manifests/external-annotation-pages-v3/manifest.json",
     }).as("external-anno-pages-manifest");
 
+    cy.intercept("GET", "/annotations/standard-v3/page-1.json", {
+      statusCode: 404,
+    }).as("404-anno-page");
+
     setupViewer();
 
     cy.wait("@external-anno-pages-manifest");
+    cy.wait("@404-anno-page");
 
     cy.get("#viewer")
       .should("have.attr", "data-status")
-      .and("match", /no-ext-anno/);
+      .and("match", /ext-anno-err/);
   });
+
+  it("Should warn if an external annotation page isn't an annotation page", () => {
+    cy.intercept("GET", "/manifests/standard-v3/manifest.json", {
+      fixture: "/manifests/external-annotation-pages-v3/manifest.json",
+    }).as("external-anno-pages-manifest");
+
+    cy.intercept("GET", "/annotations/standard-v3/page-1.json", {
+      body: { not: "an annotation page" },
+    }).as("bad-anno-page");
+
+    setupViewer();
+
+    cy.wait("@bad-anno-page");
+
+    cy.get("#viewer")
+      .should("have.attr", "data-status")
+      .and("match", /ext-anno-err/);
+  });
+
   it("Should warn if the custom POI SVG fails to fetch", () => {
     cy.intercept("GET", "/manifests/standard-v3/manifest.json", {
       fixture: "/manifests/points-of-interest-v3/manifest.json",
