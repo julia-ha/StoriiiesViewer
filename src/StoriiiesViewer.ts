@@ -26,6 +26,7 @@ import {
   isSingleV2Value,
   type RawAnnotation,
 } from "./normalise";
+import { buildSlides, type Slide } from "./slides";
 import { IIIFSaysThisIsHTML, nl2br, sanitiseHTML } from "./utils";
 
 /**
@@ -62,17 +63,6 @@ const PRESENTATION_V2_CONTEXT =
   "http://iiif.io/api/presentation/2/context.json";
 const PRESENTATION_V3_CONTEXT =
   "http://iiif.io/api/presentation/3/context.json";
-
-/**
- * A single step in the story. The viewer moves through a flat list of these:
- * a title slide, then (for each image) an optional intro slide followed by
- * that image's annotations, and finally an optional credit slide
- */
-type Slide =
-  | { type: "title"; canvasIndex: number }
-  | { type: "canvas"; canvasIndex: number }
-  | { type: "annotation"; canvasIndex: number; annotationIndex: number }
-  | { type: "credits"; canvasIndex: number };
 
 type PointOfInterestTarget = {
   type: string;
@@ -463,34 +453,14 @@ export default class StoriiiesViewer {
    * Title slide, then each canvas's annotations in turn, then credits
    */
   #buildSlides(): Slide[] {
-    const slides: Slide[] = [];
-
-    if (this.label) {
-      slides.push({ type: "title", canvasIndex: 0 });
-    }
-
-    this.canvases.forEach((_, canvasIndex) => {
-      const annotations = this.canvasAnnotations[canvasIndex];
-
-      // Images after the first get an intro slide showing the whole image,
-      // if there's something to say (a label), or nothing else would show it (no annotations)
-      if (
-        canvasIndex > 0 &&
-        (!annotations.length || this.#getCanvasLabel(canvasIndex))
-      ) {
-        slides.push({ type: "canvas", canvasIndex });
-      }
-
-      annotations.forEach((_, annotationIndex) => {
-        slides.push({ type: "annotation", canvasIndex, annotationIndex });
-      });
+    return buildSlides({
+      hasTitle: !!this.label,
+      showCredits: this.showCreditSlide,
+      canvases: this.canvases.map((_, canvasIndex) => ({
+        annotationCount: this.canvasAnnotations[canvasIndex].length,
+        hasLabel: !!this.#getCanvasLabel(canvasIndex),
+      })),
     });
-
-    if (this.showCreditSlide) {
-      slides.push({ type: "credits", canvasIndex: this.canvases.length - 1 });
-    }
-
-    return slides;
   }
 
   /**
@@ -827,8 +797,12 @@ export default class StoriiiesViewer {
     const slide = this.#slides[this.#_activeSlideIndex];
     if (!slide) return;
 
-    // Show whole image on the title slide, and when introducing an image
-    if (slide.type === "title" || slide.type === "canvas") {
+    // Show whole image on the title slide, when introducing an image, and when recapping one
+    if (
+      slide.type === "title" ||
+      slide.type === "canvas" ||
+      slide.type === "overview"
+    ) {
       this.viewer.viewport.goHome(this.#prefersReducedMotion);
       return;
     }
@@ -966,6 +940,7 @@ export default class StoriiiesViewer {
         infoTextElementMarkup = this.#creatTitleSlideMarkup();
         break;
       case "canvas":
+      case "overview":
         infoTextElementMarkup = this.#createCanvasSlideMarkup(
           slide.canvasIndex,
         );
@@ -1254,7 +1229,7 @@ export default class StoriiiesViewer {
   }
 
   /**
-   * Generate HTML markup for the slide introducing an image after the first
+   * Generate HTML markup for the slides that introduce an image after the first, and recap an image
    */
   #createCanvasSlideMarkup(canvasIndex: number): string {
     // Label should always be plain text

@@ -14,6 +14,99 @@
     {
       "@type": "sc:Sequence",
       "canvases": [
+		{
+			"@id": "https://ids.si.edu/ids/iiif/canvas-SAAM-1991.109_1",
+			"@type": "sc:Canvas",
+			"label": "image SAAM-1991.109_1",
+			"height": 3000,
+			"width": 2102,
+			"images": [
+				{
+				"@context": "http://iiif.io/api/presentation/2/context.json",
+				"@id": "https://ids.si.edu/ids/iiif/SAAM-1991.109_1",
+				"@type": "oa:Annotation",
+				"motivation": "sc:painting",
+				"resource": {
+					"@id": "https://ids.si.edu/ids/iiif/SAAM-1991.109_1/full/full/0/default.jpg",
+					"@type": "dctypes:Image",
+					"height": 3000,
+					"width": 2102,
+					"format": "image/jpeg",
+					"service": {
+					"@context": "http://iiif.io/api/image/2/context.json",
+					"@id": "https://ids.si.edu/ids/iiif/SAAM-1991.109_1",
+					"profile": "http://iiif.io/api/image/2/level2.json"
+						}
+					},
+				"on": "https://ids.si.edu/ids/iiif/SAAM-1991.109_1"
+			    }
+			]
+		},
+		{
+			"@id": "https://ids.si.edu/ids/iiif/canvas-CHSDM-B3F79179F6E22-000001",
+			"@type": "sc:Canvas",
+			"label": "image CHSDM-B3F79179F6E22-000001",
+			"height": 6400,
+			"width": 4836,
+			"images": [
+			  {
+				"@context": "http://iiif.io/api/presentation/2/context.json",
+				"@id": "https://ids.si.edu/ids/iiif/CHSDM-B3F79179F6E22-000001",
+				"@type": "oa:Annotation",
+				"motivation": "sc:painting",
+				"resource": {
+				  "@id": "https://ids.si.edu/ids/iiif/CHSDM-B3F79179F6E22-000001/full/full/0/default.jpg",
+				  "@type": "dctypes:Image",
+				  "height": 6400,
+				  "width": 4836,
+				  "format": "image/jpeg",
+				  "service": {
+					"@context": "http://iiif.io/api/image/2/context.json",
+					"@id": "https://ids.si.edu/ids/iiif/CHSDM-B3F79179F6E22-000001",
+					"profile": "http://iiif.io/api/image/2/level2.json"
+				  }
+				},
+				"on": "https://ids.si.edu/ids/iiif/CHSDM-B3F79179F6E22-000001"
+			  }
+			],
+			"otherContent": [
+				{
+				"@type": "sc:AnnotationList",
+				"@id": "http://localhost:43111/annotations/standard-v2/list-copy.json",
+				"label": "Annotations for canvas image CHSDM-B3F79179F6E22-000001"
+				}
+			]
+		  },
+
+		  {
+			"@id": "https://ids.si.edu/ids/iiif/canvas-CHSDM-D5A50F69BF6D2_01-000001",
+			"@type": "sc:Canvas",
+			"label": "image CHSDM-D5A50F69BF6D2_01-000001",
+			"height": 7040,
+			"width": 5826,
+			"images": [
+			  {
+				"@context": "http://iiif.io/api/presentation/2/context.json",
+				"@id": "https://ids.si.edu/ids/iiif/CHSDM-D5A50F69BF6D2_01-000001",
+				"@type": "oa:Annotation",
+				"motivation": "sc:painting",
+				"resource": {
+				  "@id": "https://ids.si.edu/ids/iiif/CHSDM-D5A50F69BF6D2_01-000001/full/full/0/default.jpg",
+				  "@type": "dctypes:Image",
+				  "height": 7040,
+				  "width": 5826,
+				  "format": "image/jpeg",
+				  "service": {
+					"@context": "http://iiif.io/api/image/2/context.json",
+					"@id": "https://ids.si.edu/ids/iiif/CHSDM-D5A50F69BF6D2_01-000001",
+					"profile": "http://iiif.io/api/image/2/level2.json"
+				  }
+				},
+				"on": "https://ids.si.edu/ids/iiif/CHSDM-D5A50F69BF6D2_01-000001"
+			  }
+			]
+		  },
+
         {
           "@id": "http://localhost:43110/images/exact-tiles/canvas/v2-1",
           "@type": "sc:Canvas",

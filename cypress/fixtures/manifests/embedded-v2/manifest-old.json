@@ -1,0 +1,115 @@
+{
+  "@context": "http://iiif.io/api/presentation/2/context.json",
+  "@id": "http://localhost:43110/manifests/embedded-v2/manifest.json",
+  "@type": "sc:Manifest",
+  "label": "Embedded v2 manifest",
+  "description": [
+    {
+      "@value": "An embedded v2 description",
+      "@language": "en"
+    }
+  ],
+  "attribution": "Courtesy of Example Institution",
+  "sequences": [
+    {
+      "@type": "sc:Sequence",
+      "canvases": [
+        {
+          "@id": "http://localhost:43110/images/exact-tiles/canvas/v2-1",
+          "@type": "sc:Canvas",
+          "label": "First v2 canvas",
+          "width": 2048,
+          "height": 2048,
+          "images": [
+            {
+              "@type": "oa:Annotation",
+              "motivation": "sc:painting",
+              "resource": {
+                "@id": "http://localhost:43110/images/exact-tiles/full/full/0/default.jpg",
+                "@type": "dctypes:Image",
+                "format": "image/jpeg",
+                "width": 2048,
+                "height": 2048,
+                "service": {
+                  "@context": "http://iiif.io/api/image/2/context.json",
+                  "profile": "http://iiif.io/api/image/2/level0.json",
+                  "@id": "http://localhost:43110/images/exact-tiles"
+                }
+              },
+              "on": "http://localhost:43110/images/exact-tiles/canvas/v2-1"
+            }
+          ],
+          "otherContent": [
+            {
+              "@id": "http://localhost:43110/annotations/embedded-v2/list-1",
+              "@type": "sc:AnnotationList",
+              "resources": [
+                {
+                  "@type": "oa:Annotation",
+                  "@id": "http://localhost:43110/annotations/embedded-v2/list-1/1",
+                  "motivation": "oa:commenting",
+                  "resource": {
+                    "@type": "cnt:ContentAsText",
+                    "format": "text/plain",
+                    "chars": "Embedded v2 annotation\n\nwith a line break"
+                  },
+                  "on": {
+                    "@type": "oa:SpecificResource",
+                    "full": "http://localhost:43110/images/exact-tiles/canvas/v2-1",
+                    "selector": {
+                      "@type": "oa:FragmentSelector",
+                      "value": "xywh=265,661,100,200"
+                    }
+                  }
+                },
+                {
+                  "@type": "oa:Annotation",
+                  "@id": "http://localhost:43110/annotations/embedded-v2/list-1/2",
+                  "motivation": "oa:commenting",
+                  "resource": {
+                    "@type": "cnt:ContentAsText",
+                    "format": "text/html",
+                    "chars": "<p><strong onclick=\"alert('x')\">Bold</strong> html text</p>"
+                  },
+                  "on": "http://localhost:43110/images/exact-tiles/canvas/v2-1#xywh=500,500,200,200"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "@id": "http://localhost:43110/images/tractor/canvas/v2-2",
+          "@type": "sc:Canvas",
+          "label": "Second v2 canvas",
+          "width": 4031,
+          "height": 3023,
+          "images": [
+            {
+              "@type": "oa:Annotation",
+              "motivation": "sc:painting",
+              "resource": {
+                "@id": "http://localhost:43110/images/tractor/full/full/0/default.jpg",
+                "@type": "dctypes:Image",
+                "format": "image/jpeg",
+                "width": 4031,
+                "height": 3023,
+                "service": {
+                  "@context": "http://iiif.io/api/image/2/context.json",
+                  "profile": "http://iiif.io/api/image/2/level0.json",
+                  "@id": "http://localhost:43110/images/tractor"
+                }
+              },
+              "on": "http://localhost:43110/images/tractor/canvas/v2-2"
+            }
+          ],
+          "otherContent": [
+            {
+              "@id": "http://localhost:43110/annotations/standard-v2/list.json",
+              "@type": "sc:AnnotationList"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
