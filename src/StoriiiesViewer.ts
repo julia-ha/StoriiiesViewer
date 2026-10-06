@@ -37,6 +37,9 @@ import { IIIFSaysThisIsHTML, nl2br, sanitiseHTML } from "./utils";
  * @property {boolean} disablePanAndZoom - Whether to disable user panning and zooming (default: false)
  * @property {string} pointOfInterestSvgUrl - URL for a custom SVG to use for points of interest (default: a ring with a dot in the middle)
  * @property {boolean} showThumbnails - Whether to show previews of each image, for jumping between them, when the manifest has more than one (default: true)
+ * @property {boolean} showLandingPage - Whether to start with a landing page introducing the story, which replaces the title slide (default: false)
+ * @property {string} landingPageEyebrow - Short text shown above the title on the landing page. Use an empty string for none (default: "Exhibit")
+ * @property {string} landingPageButtonLabel - Text of the button that starts the story from the landing page (default: "Start Exhibit")
  */
 export interface StoriiiesViewerConfig {
   container: HTMLElement | Element | string | null;
@@ -45,6 +48,9 @@ export interface StoriiiesViewerConfig {
   disablePanAndZoom?: boolean;
   pointOfInterestSvgUrl?: string;
   showThumbnails?: boolean;
+  showLandingPage?: boolean;
+  landingPageEyebrow?: string;
+  landingPageButtonLabel?: string;
 }
 
 type ControlButtons = {
@@ -58,6 +64,9 @@ type statusCodes = {
 
 /** Width in pixels to ask the image service for when making image previews (about double the displayed size, for high density screens) */
 const THUMBNAIL_TARGET_WIDTH = 160;
+
+/** Width in pixels to ask the image service for when making the blurred background of the landing page, which doesn't need much detail */
+const LANDING_IMAGE_TARGET_WIDTH = 640;
 
 const PRESENTATION_V2_CONTEXT =
   "http://iiif.io/api/presentation/2/context.json";
@@ -133,6 +142,18 @@ export default class StoriiiesViewer {
    * @readonly
    */
   public showThumbnails: boolean = true;
+  /** Whether to start with a landing page introducing the story
+   * @readonly
+   */
+  public showLandingPage: boolean = false;
+  /** Short text shown above the title on the landing page
+   * @readonly
+   */
+  public landingPageEyebrow: string = "Exhibit";
+  /** Text of the button that starts the story from the landing page
+   * @readonly
+   */
+  public landingPageButtonLabel: string = "Start Exhibit";
   /** ID used for creating id attributes that shouldn't clash, or referencing a particular instance of StoriiiesViewer
    * @readonly
    */
@@ -174,6 +195,10 @@ export default class StoriiiesViewer {
    * @readonly
    */
   public thumbnailsElement?: HTMLElement;
+  /** The landing page, if there is one */
+  public landingElement?: HTMLElement;
+  /** The button on the landing page that starts the story, if there is one */
+  public landingStartButton?: HTMLButtonElement;
   /** A reference to the info-toggle HTML element
    * @readonly
    */
@@ -265,6 +290,11 @@ export default class StoriiiesViewer {
     this.disablePanAndZoom = config.disablePanAndZoom ?? false;
 
     this.showThumbnails = config.showThumbnails ?? true;
+
+    this.showLandingPage = config.showLandingPage ?? false;
+    this.landingPageEyebrow = config.landingPageEyebrow ?? "Exhibit";
+    this.landingPageButtonLabel =
+      config.landingPageButtonLabel ?? "Start Exhibit";
 
     this.pointOfInterestSvgUrl = config.pointOfInterestSvgUrl;
 
@@ -454,6 +484,7 @@ export default class StoriiiesViewer {
    */
   #buildSlides(): Slide[] {
     return buildSlides({
+      hasLanding: this.showLandingPage,
       hasTitle: !!this.label,
       showCredits: this.showCreditSlide,
       canvases: this.canvases.map((_, canvasIndex) => ({
@@ -797,8 +828,9 @@ export default class StoriiiesViewer {
     const slide = this.#slides[this.#_activeSlideIndex];
     if (!slide) return;
 
-    // Show whole image on the title slide, when introducing an image, and when recapping one
+    // Show whole image on the landing page and title slide, when introducing an image, and when recapping one
     if (
+      slide.type === "landing" ||
       slide.type === "title" ||
       slide.type === "canvas" ||
       slide.type === "overview"
@@ -854,8 +886,9 @@ export default class StoriiiesViewer {
    * Used to navigate between canvases, moving to the first slide for that canvas
    */
   set activeCanvasIndex(index: number) {
+    // The landing page isn't part of any image, so jumping to an image goes past it
     const slideIndex = this.#slides.findIndex(
-      (slide) => slide.canvasIndex === index,
+      (slide) => slide.canvasIndex === index && slide.type !== "landing",
     );
     if (slideIndex !== -1) {
       this.activeSlideIndex = slideIndex;
@@ -907,6 +940,8 @@ export default class StoriiiesViewer {
     const lowerBound = 0;
     const upperBound = this.#slides.length - 1;
     const slide = this.#slides[index];
+    // Undefined when first setting up
+    const previousSlide = this.#slides[this.#_activeSlideIndex];
     let infoTextElementMarkup;
 
     this.#_activeSlideIndex = index;
@@ -936,6 +971,10 @@ export default class StoriiiesViewer {
 
     // Determine rendering method for info text area
     switch (slide.type) {
+      case "landing":
+        // Nothing to show in the info area, as the landing page covers it
+        infoTextElementMarkup = "";
+        break;
       case "title":
         infoTextElementMarkup = this.#creatTitleSlideMarkup();
         break;
@@ -955,6 +994,7 @@ export default class StoriiiesViewer {
     this.infoTextElement.innerHTML = infoTextElementMarkup;
 
     this.#updateThumbnails();
+    this.#updateLandingPage(slide.type === "landing", previousSlide);
 
     if (canvasChanged) {
       // Swap the image. Markers and viewport are updated when it has loaded
@@ -1080,6 +1120,7 @@ export default class StoriiiesViewer {
     this.infoToggleElement = infoToggleEl;
 
     this.#insertThumbnails();
+    this.#insertLandingPage();
 
     // Initialise values, let the setters handle the rest
     this.showInfoArea = true;
@@ -1087,10 +1128,132 @@ export default class StoriiiesViewer {
   }
 
   /**
+   * Create the landing page, which introduces the story before it starts\
+   * It's a layer over the whole viewer, with a blurred copy of the first image behind the title
+   */
+  #insertLandingPage() {
+    if (!this.showLandingPage || !this.containerElement) return;
+
+    const landingEl = document.createElement("div");
+    landingEl.id = `storiiies-viewer-${this.instanceId}__landing`;
+    landingEl.classList.add("storiiies-viewer__landing");
+    landingEl.setAttribute("role", "region");
+    landingEl.ariaLabel = "Introduction";
+
+    // Blurred copy of the first image. Purely decorative, and not essential, so it's added when it's ready
+    const imageEl = document.createElement("img");
+    imageEl.classList.add("storiiies-viewer__landing-image");
+    imageEl.alt = "";
+    imageEl.setAttribute("aria-hidden", "true");
+    imageEl.addEventListener("load", () => {
+      imageEl.dataset.loaded = "true";
+    });
+    landingEl.append(imageEl);
+    this.#getThumbnailUrl(0, LANDING_IMAGE_TARGET_WIDTH).then((url) => {
+      if (url) imageEl.src = url;
+    });
+
+    const contentEl = document.createElement("div");
+    contentEl.classList.add("storiiies-viewer__landing-content");
+
+    // Text provided in the config is always plain text
+    if (this.landingPageEyebrow) {
+      const eyebrowEl = document.createElement("p");
+      eyebrowEl.classList.add("storiiies-viewer__landing-eyebrow");
+      eyebrowEl.textContent = this.landingPageEyebrow;
+      contentEl.append(eyebrowEl);
+    }
+
+    // Everything from the manifest is sanitised, in the same way as on the title slide
+    if (this.label) {
+      const titleEl = document.createElement("h1");
+      titleEl.classList.add("storiiies-viewer__landing-title");
+      titleEl.innerHTML = sanitiseHTML(nl2br(this.label), this.DOMPurifyConfig);
+      contentEl.append(titleEl);
+    }
+
+    if (this.summary) {
+      const summaryEl = document.createElement("div");
+      summaryEl.classList.add("storiiies-viewer__landing-summary");
+      summaryEl.innerHTML = sanitiseHTML(
+        IIIFSaysThisIsHTML(this.summary) ? this.summary : nl2br(this.summary),
+        this.DOMPurifyConfig,
+      );
+      contentEl.append(summaryEl);
+    }
+
+    // Only the value of the required statement, so it reads as a byline
+    if (this.requiredStatement.value) {
+      const bylineEl = document.createElement("div");
+      bylineEl.classList.add("storiiies-viewer__landing-byline");
+      bylineEl.innerHTML = sanitiseHTML(
+        IIIFSaysThisIsHTML(this.requiredStatement.value)
+          ? this.requiredStatement.value
+          : nl2br(this.requiredStatement.value),
+        this.DOMPurifyConfig,
+      );
+      contentEl.append(bylineEl);
+    }
+
+    const startButtonEl = document.createElement("button");
+    startButtonEl.id = `storiiies-viewer-${this.instanceId}__landing-start`;
+    startButtonEl.type = "button";
+    startButtonEl.classList.add("storiiies-viewer__landing-start");
+    const startLabelEl = document.createElement("span");
+    startLabelEl.textContent = this.landingPageButtonLabel;
+    startButtonEl.append(startLabelEl);
+    startButtonEl.insertAdjacentHTML(
+      "beforeend",
+      `<span class="storiiies-viewer__button-icon" inert>${arrowIcon}</span>`,
+    );
+    startButtonEl.addEventListener("click", () => {
+      this.activeSlideIndex = this.activeSlideIndex + 1;
+    });
+    contentEl.append(startButtonEl);
+
+    landingEl.append(contentEl);
+    this.containerElement.insertAdjacentElement("beforeend", landingEl);
+
+    this.landingElement = landingEl;
+    this.landingStartButton = startButtonEl;
+  }
+
+  /**
+   * Show or hide the landing page, depending on the active slide\
+   * While it's showing, the rest of the viewer is hidden and can't be interacted with
+   */
+  #updateLandingPage(isLanding: boolean, previousSlide?: Slide) {
+    const landingEl = this.landingElement;
+    if (!landingEl) return;
+
+    landingEl.dataset.visible = `${isLanding}`;
+    landingEl.inert = !isLanding;
+    this.containerElement?.classList.toggle(
+      "storiiies-viewer--landing",
+      isLanding,
+    );
+    // Keep keyboard users away from the image while it's covered
+    this.viewer.element.inert = isLanding;
+
+    // The element with focus is about to be hidden, so move focus somewhere sensible
+    // (but not when the viewer is first being set up, as that would steal focus from the page)
+    if (previousSlide) {
+      if (isLanding) {
+        this.landingStartButton?.focus();
+      } else if (previousSlide.type === "landing") {
+        this.controlButtonElements.next.focus();
+      }
+    }
+  }
+
+  /**
    * Get the URL of an image to use as a preview of a canvas\
    * Uses the canvas's own thumbnail if it has one, otherwise asks its image service for a suitable size
    */
-  async #getThumbnailUrl(canvasIndex: number): Promise<string | undefined> {
+  async #getThumbnailUrl(
+    canvasIndex: number,
+    targetWidth: number = THUMBNAIL_TARGET_WIDTH,
+  ): Promise<string | undefined> {
     const canvas = this.canvases[canvasIndex];
 
     const provided = getCanvasThumbnailUrl({
@@ -1102,7 +1265,7 @@ export default class StoriiiesViewer {
     if (!serviceId) return undefined;
 
     // Level 0 image services only deliver the sizes they list in their info.json
-    let width = THUMBNAIL_TARGET_WIDTH;
+    let width = targetWidth;
     try {
       const response = await fetch(this.#expandServiceID(serviceId));
       if (response.ok) {

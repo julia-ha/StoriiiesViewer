@@ -1,9 +1,10 @@
 /**
  * A single step in the story. The viewer moves through a flat list of these:
- * a title slide, then (for each image) an optional intro slide, that image's annotations,
- * and an overview slide, and finally an optional credit slide
+ * an optional landing page or a title slide, then (for each image) an optional intro slide,
+ * that image's annotations, and an overview slide, and finally an optional credit slide
  */
 export type Slide =
+  | { type: "landing"; canvasIndex: number }
   | { type: "title"; canvasIndex: number }
   | { type: "canvas"; canvasIndex: number }
   | { type: "annotation"; canvasIndex: number; annotationIndex: number }
@@ -11,6 +12,8 @@ export type Slide =
   | { type: "credits"; canvasIndex: number };
 
 export type SlideOptions = {
+  /** Whether the story starts with a landing page. It introduces the story, so replaces the title slide */
+  hasLanding?: boolean;
   /** Whether there's a title slide (the manifest has a label) */
   hasTitle: boolean;
   /** Whether there's a credit slide at the end */
@@ -23,6 +26,7 @@ export type SlideOptions = {
  * Work out every slide in the story, in order
  */
 export function buildSlides({
+  hasLanding = false,
   hasTitle,
   showCredits,
   canvases,
@@ -30,7 +34,10 @@ export function buildSlides({
   const slides: Slide[] = [];
   const hasMultipleImages = canvases.length > 1;
 
-  if (hasTitle) {
+  if (hasLanding) {
+    // The landing page already shows what the title slide would, so it's not repeated
+    slides.push({ type: "landing", canvasIndex: 0 });
+  } else if (hasTitle) {
     slides.push({ type: "title", canvasIndex: 0 });
   }
 

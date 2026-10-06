@@ -31,6 +31,10 @@
   --storiiies-viewer-scroll-size: 8px;
   --storiiies-viewer-thumbnail-size: 72px;
   --storiiies-viewer-thumbnail-gap: 8px;
+  --storiiies-viewer-landing-bg: #555;
+  --storiiies-viewer-landing-fg: #fff;
+  --storiiies-viewer-landing-image-blur: 24px;
+  --storiiies-viewer-landing-image-brightness: 0.6;
 
   position: relative;
   inline-size: 100%;
@@ -287,6 +291,129 @@
 }
 
 /*
+* ## Landing page
+*/
+.storiiies-viewer__landing {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  padding: calc(var(--storiiies-viewer-outer-spacing) * 2);
+  overflow: auto;
+  color: var(--storiiies-viewer-landing-fg);
+  font-family: var(--storiiies-viewer-font-family);
+  font-size: var(--storiiies-viewer-font-size);
+  line-height: var(--storiiies-viewer-line-height);
+  text-align: center;
+  background: var(--storiiies-viewer-landing-bg);
+  opacity: 1;
+  visibility: visible;
+}
+
+.storiiies-viewer__landing[data-visible="false"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Soft edged, darkened copy of the first image */
+.storiiies-viewer__landing-image {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+  filter: blur(var(--storiiies-viewer-landing-image-blur))
+    brightness(var(--storiiies-viewer-landing-image-brightness));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.storiiies-viewer__landing-image[data-loaded="true"] {
+  opacity: 1;
+}
+
+.storiiies-viewer__landing-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--storiiies-viewer-row-gap) * 1.5);
+  max-inline-size: 44rem;
+  /* Centres the content, without cutting it off if there's too much to fit */
+  margin: auto;
+}
+
+.storiiies-viewer__landing-eyebrow {
+  margin: 0;
+  font-size: 0.875em;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+}
+
+.storiiies-viewer__landing-title {
+  margin: 0;
+  font-size: clamp(2rem, 9cqi, 4.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.storiiies-viewer__landing-summary {
+  font-size: 1.25em;
+  opacity: 0.85;
+}
+
+.storiiies-viewer__landing-byline {
+  opacity: 0.9;
+}
+
+.storiiies-viewer__landing-summary > *,
+.storiiies-viewer__landing-byline > * {
+  margin-block: 0;
+}
+
+.storiiies-viewer__landing-summary a,
+.storiiies-viewer__landing-byline a {
+  color: inherit;
+}
+
+.storiiies-viewer__landing-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75em;
+  margin-block-start: var(--storiiies-viewer-row-gap);
+  padding: 0.85em 1.75em;
+  color: var(--storiiies-viewer-button-fg);
+  font-family: inherit;
+  font-size: 1.25em;
+  font-weight: 600;
+  line-height: 1;
+  background: var(--storiiies-viewer-button-bg);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 100ms,
+    background 100ms;
+}
+
+.storiiies-viewer__landing-start:focus-visible,
+.storiiies-viewer__landing-start:hover {
+  color: var(--storiiies-viewer-button-hover-fg);
+  background: var(--storiiies-viewer-button-hover-bg);
+  outline: 2px solid var(--storiiies-viewer-accent-inner);
+  box-shadow: 0 0 0 4px var(--storiiies-viewer-accent-outer);
+}
+
+/* The landing page covers everything, so the rest of the viewer shouldn't be reachable while it shows */
+.storiiies-viewer--landing .storiiies-viewer__info-area,
+.storiiies-viewer--landing .storiiies-viewer__info-toggle,
+.storiiies-viewer--landing .storiiies-viewer__thumbnails {
+  visibility: hidden;
+}
+
+/*
 * ## Media queries
 */
 @media (prefers-reduced-motion: no-preference) {
@@ -303,6 +430,23 @@
 
   .storiiies-viewer__info-toggle {
     transition: inset-block-end var(--storiiies-viewer-transition-speed) ease-in-out;
+  }
+
+  /* Visibility is delayed when hiding, so the fade can finish first */
+  .storiiies-viewer__landing {
+    transition:
+      opacity var(--storiiies-viewer-transition-speed) ease-in-out,
+      visibility 0s linear 0s;
+  }
+
+  .storiiies-viewer__landing[data-visible="false"] {
+    transition:
+      opacity var(--storiiies-viewer-transition-speed) ease-in-out,
+      visibility 0s linear var(--storiiies-viewer-transition-speed);
+  }
+
+  .storiiies-viewer__landing-image {
+    transition: opacity var(--storiiies-viewer-transition-speed) ease-in-out;
   }
 }
 
