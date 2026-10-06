@@ -14,6 +14,18 @@ import showIcon from "./images/eye.svg?raw";
 import hideIcon from "./images/hide.svg?raw";
 import poiIcon from "./images/poi.svg?raw";
 import restartIcon from "./images/restart.svg?raw";
+import {
+  buildImageUrl,
+  chooseImageSize,
+  getAnnotationsFromPage,
+  getCanvasAnnotationPages,
+  getCanvasThumbnailUrl,
+  getPageUrl,
+  getV2ImageServiceId,
+  iiifValueToString,
+  isSingleV2Value,
+  type RawAnnotation,
+} from "./normalise";
 import { IIIFSaysThisIsHTML, nl2br, sanitiseHTML } from "./utils";
 
 /**
@@ -23,6 +35,7 @@ import { IIIFSaysThisIsHTML, nl2br, sanitiseHTML } from "./utils";
  * @property {boolean} showCreditSlide - Whether to show the final credit slide (default: true)
  * @property {boolean} disablePanAndZoom - Whether to disable user panning and zooming (default: false)
  * @property {string} pointOfInterestSvgUrl - URL for a custom SVG to use for points of interest (default: a ring with a dot in the middle)
+ * @property {boolean} showThumbnails - Whether to show previews of each image, for jumping between them, when the manifest has more than one (default: true)
  */
 export interface StoriiiesViewerConfig {
   container: HTMLElement | Element | string | null;
@@ -30,6 +43,7 @@ export interface StoriiiesViewerConfig {
   showCreditSlide?: boolean;
   disablePanAndZoom?: boolean;
   pointOfInterestSvgUrl?: string;
+  showThumbnails?: boolean;
 }
 
 type ControlButtons = {
@@ -41,26 +55,24 @@ type statusCodes = {
   [key: string]: ["warn" | "error", string];
 };
 
-type RawAnnotationPage = {
-  id: string;
-  type: string;
-  items: Array<RawAnnotation>;
-};
+/** Width in pixels to ask the image service for when making image previews (about double the displayed size, for high density screens) */
+const THUMBNAIL_TARGET_WIDTH = 160;
 
-type RawAnnotation = {
-  id: string;
-  type: string;
-  motivation: string;
-  body: RawAnnotationBody;
-  target: string;
-};
+const PRESENTATION_V2_CONTEXT =
+  "http://iiif.io/api/presentation/2/context.json";
+const PRESENTATION_V3_CONTEXT =
+  "http://iiif.io/api/presentation/3/context.json";
 
-type RawAnnotationBody = {
-  type: string;
-  value: string;
-  language: string;
-  format: string;
-};
+/**
+ * A single step in the story. The viewer moves through a flat list of these:
+ * a title slide, then (for each image) an optional intro slide followed by
+ * that image's annotations, and finally an optional credit slide
+ */
+type Slide =
+  | { type: "title"; canvasIndex: number }
+  | { type: "canvas"; canvasIndex: number }
+  | { type: "annotation"; canvasIndex: number; annotationIndex: number }
+  | { type: "credits"; canvasIndex: number };
 
 type PointOfInterestTarget = {
   type: string;
@@ -73,20 +85,18 @@ type PointOfInterestTarget = {
 };
 
 export default class StoriiiesViewer {
-  /** Index pointing to the annotation from the annotationPage, currently being viewed\
-   * The active annotationPage is treated as being the same as activeCanvasIndex
-   */
-  #_activeAnnotationIndex: number = -1;
+  /** Index pointing to the slide currently being viewed */
+  #_activeSlideIndex: number = -1;
   /** Index pointing to the canvas from the manifest currently being viewed\
-   * This value is also used to infer the active annotationPage
+   * This is derived from the active slide, and is used to pick the right image and annotations
    */
   #_activeCanvasIndex: number = 0;
   /** Visibility flag for the infoArea element */
   #_showInfoArea: boolean = true;
-  /** Lowermost number of slides considering factors such as a title slide */
-  #annotationIndexFloor: number = -1;
-  /** Uppermost number of slides considering factors such as credits */
-  #annotationIndexCeiling!: number;
+  /** Every slide in the story, in order */
+  #slides: Slide[] = [];
+  /** Set when a different canvas is being opened, so the viewport can be updated once the new image has loaded */
+  #canvasSwitchPending: boolean = false;
   /** Cached user preference on reduced-motion */
   #prefersReducedMotion!: boolean;
   /** Error codes and their levels and user facing log messages */
@@ -103,7 +113,14 @@ export default class StoriiiesViewer {
       "warn",
       "Manifest doesn't contain a label. This is required by the IIIF Presentation API",
     ],
-    "no-ext-anno": ["warn", "External annotationPages are not supported"],
+    "ext-anno-err": [
+      "warn",
+      "Failed to load an externally referenced annotationPage",
+    ],
+    "no-image-service": [
+      "warn",
+      "Canvas doesn't have an IIIF image service and was skipped",
+    ],
     "poi-svg-err": ["warn", "Failed to load custom POI SVG"],
     "poi-svg-invalid": ["error", "Fetched content is not a valid SVG"],
     "poi-svg-default-err": ["error", "Failed to parse default POI SVG"],
@@ -122,6 +139,10 @@ export default class StoriiiesViewer {
   public manifestUrl: string;
   /** Whether to disable panning and scrolling */
   public disablePanAndZoom: boolean = false;
+  /** Whether to show previews of each image when there is more than one
+   * @readonly
+   */
+  public showThumbnails: boolean = true;
   /** ID used for creating id attributes that shouldn't clash, or referencing a particular instance of StoriiiesViewer
    * @readonly
    */
@@ -139,8 +160,10 @@ export default class StoriiiesViewer {
   };
   /** The canvases retrieved from the manifest */
   public canvases!: Canvas[];
-  /** The annotationPages retrieved from the manifest */
+  /** The annotationPages retrieved from the manifest, across all canvases */
   public annotationPages: AnnotationPage[] = [];
+  /** The annotations for each canvas, in the same order as `canvases` */
+  public canvasAnnotations: Array<Array<Annotation>> = [];
   /** The annotations for the current canvas */
   public activeCanvasAnnotations: Array<Annotation> = [];
   /** A reference to the OpenSeadragon viewer */
@@ -157,6 +180,10 @@ export default class StoriiiesViewer {
    * @readonly
    */
   public controlButtonElements!: ControlButtons;
+  /** A reference to the image previews HTML element. Only present when there's more than one image
+   * @readonly
+   */
+  public thumbnailsElement?: HTMLElement;
   /** A reference to the info-toggle HTML element
    * @readonly
    */
@@ -247,6 +274,8 @@ export default class StoriiiesViewer {
 
     this.disablePanAndZoom = config.disablePanAndZoom ?? false;
 
+    this.showThumbnails = config.showThumbnails ?? true;
+
     this.pointOfInterestSvgUrl = config.pointOfInterestSvgUrl;
 
     // Throw if the required config is missing and halt instantiation
@@ -308,25 +337,49 @@ export default class StoriiiesViewer {
     });
 
     this.manifest = new Manifest(rawManifest);
-    this.canvases = this.manifest.getSequenceByIndex(0)?.getCanvases();
+    const allCanvases: Canvas[] =
+      this.manifest.getSequenceByIndex(0)?.getCanvases() ?? [];
 
     // A valid manifest must have at least one canvas
     // Assume "not a manifest" and throw an error
-    if (!this?.canvases?.length) {
+    if (!allCanvases.length) {
+      this.#logger("bad-manifest", true);
+    }
+
+    // Only canvases with an IIIF image service can be shown
+    this.canvases = allCanvases.filter((canvas: Canvas) => {
+      const hasImageService = !!this.#getImageServiceId(canvas);
+      if (!hasImageService) this.#logger("no-image-service");
+      return hasImageService;
+    });
+
+    if (!this.canvases.length) {
       this.#logger("bad-manifest", true);
     }
 
     // Warn about unsupported manifest versions
+    // (Presentation API v2 manifests are converted as they're read, v3 is the native format)
+    const contexts: unknown[] = ([] as unknown[]).concat(
+      this.manifest.context ?? [],
+    );
     if (
-      this.manifest.context !== "http://iiif.io/api/presentation/3/context.json"
+      !contexts.some(
+        (context) =>
+          context === PRESENTATION_V3_CONTEXT ||
+          context === PRESENTATION_V2_CONTEXT,
+      )
     ) {
       this.#logger("unkn-version");
     }
 
-    this.label = this.manifest.getLabel().getValue() || "";
+    this.label = this.#getLabel(this.manifest);
 
     // At the time of writing, a manifest.getSummary() doesn't exist
-    this.summary = this.manifest.getProperty("summary")?.en[0] || "";
+    // v2 manifests have a "description" instead
+    this.summary =
+      this.manifest.getProperty("summary")?.en?.[0] ||
+      iiifValueToString(this.manifest.getProperty("description")) ||
+      "";
     let requiredStatementLabel;
     let requiredStatementValue;
 
@@ -347,24 +400,97 @@ export default class StoriiiesViewer {
 
     this.requiredStatement = {
       label: requiredStatementLabel || "",
-      value: requiredStatementValue || "",
+      // v2 manifests have an "attribution" instead
+      value:
+        requiredStatementValue ||
+        iiifValueToString(this.manifest.getProperty("attribution")) ||
+        "",
     };
 
     // It's worth noting display of a title slide is predicated on the presence of a label in the manifest
-    // In lieu of a label, set the floor to 0 to effectively remove the title slide
+    // Without one there's no title slide, but we should also warn that this is invalid
     if (!this.label) {
-      this.#annotationIndexFloor = 0;
-
-      // But should also warn that this is invalid
       this.#logger("no-label");
     }
 
-    this.annotationPages = this.#getAnnotationPages();
-    this.activeCanvasAnnotations = this.#getActiveCanvasAnnotations();
-    // Calculate the upper bound for the annotation index
-    this.#annotationIndexCeiling = this.showCreditSlide
-      ? this.activeCanvasAnnotations.length
-      : this.activeCanvasAnnotations.length - 1;
+    await this.#loadAnnotations();
+    this.activeCanvasAnnotations = this.canvasAnnotations[0] ?? [];
+    this.#slides = this.#buildSlides();
+  }
+
+  /**
+   * Get the label of a canvas, if it has one
+   */
+  #getCanvasLabel(canvasIndex: number): string {
+    return this.#getLabel(this.canvases[canvasIndex]);
+  }
+
+  /**
+   * Get the label of a manifest or canvas as plain text
+   */
+  #getLabel(resource: Manifest | Canvas): string {
+    try {
+      // A lone v2 style { "@value", "@language" } object isn't something every
+      // language map parser copes with, so read those directly
+      const rawLabel = resource.getProperty("label");
+      if (isSingleV2Value(rawLabel)) {
+        return iiifValueToString(rawLabel);
+      }
+      return resource.getLabel().getValue() || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  /**
+   * Get the id of the IIIF image service for a canvas\
+   * Falls back to reading v2 canvases directly
+   */
+  #getImageServiceId(canvas: Canvas): string | undefined {
+    let serviceId: string | undefined;
+    try {
+      serviceId = canvas.imageServiceIds?.[0];
+    } catch (e) {
+      // Ignore, and try the fallback
+    }
+    return (
+      serviceId || getV2ImageServiceId({ images: canvas.getProperty("images") })
+    );
+  }
+
+  /**
+   * Work out every slide in the story\
+   * Title slide, then each canvas's annotations in turn, then credits
+   */
+  #buildSlides(): Slide[] {
+    const slides: Slide[] = [];
+
+    if (this.label) {
+      slides.push({ type: "title", canvasIndex: 0 });
+    }
+
+    this.canvases.forEach((_, canvasIndex) => {
+      const annotations = this.canvasAnnotations[canvasIndex];
+
+      // Images after the first get an intro slide showing the whole image,
+      // if there's something to say (a label), or nothing else would show it (no annotations)
+      if (
+        canvasIndex > 0 &&
+        (!annotations.length || this.#getCanvasLabel(canvasIndex))
+      ) {
+        slides.push({ type: "canvas", canvasIndex });
+      }
+
+      annotations.forEach((_, annotationIndex) => {
+        slides.push({ type: "annotation", canvasIndex, annotationIndex });
+      });
+    });
+
+    if (this.showCreditSlide) {
+      slides.push({ type: "credits", canvasIndex: this.canvases.length - 1 });
+    }
+
+    return slides;
   }
 
   /**
@@ -375,13 +501,13 @@ export default class StoriiiesViewer {
     osdContainer.id = `storiiies-viewer-${this.instanceId}__osd-container`;
     osdContainer.classList.add("storiiies-viewer__osd-container");
     this.containerElement?.insertAdjacentElement("afterbegin", osdContainer);
+    if (this.containerElement) {
+      this.containerElement.dataset.activeCanvas =
+        this.activeCanvasIndex.toString();
+    }
     this.viewer = OpenSeadragon({
       element: osdContainer,
-      tileSources: [
-        this.#expandServiceID(
-          this.canvases[this.activeCanvasIndex].imageServiceIds[0],
-        ),
-      ],
+      tileSources: [this.#getTileSource(this.activeCanvasIndex)],
       crossOriginPolicy: "Anonymous",
       showSequenceControl: false,
       showHomeControl: false,
@@ -408,9 +534,43 @@ export default class StoriiiesViewer {
         this.containerElement.dataset.loaded = "true";
         // Remove any existing points of interest and re-render
         this.viewer.clearOverlays();
-        this.#renderPointsOfInterest();
+        this.#renderPointsOfInterest().then(() => {
+          this.#updatePointOfInterestMarkers();
+        });
+
+        // A different image has just loaded, so bring the viewport to the active slide
+        if (this.#canvasSwitchPending) {
+          this.#canvasSwitchPending = false;
+          this.#updateViewer();
+        }
       }
     });
+  }
+
+  /**
+   * Get the OpenSeadragon tile source for a canvas
+   */
+  #getTileSource(canvasIndex: number): string {
+    return this.#expandServiceID(
+      this.#getImageServiceId(this.canvases[canvasIndex]) ?? "",
+    );
+  }
+
+  /**
+   * Replace the image in the viewer with the one for a different canvas
+   */
+  #openCanvas(canvasIndex: number) {
+    this.#_activeCanvasIndex = canvasIndex;
+    this.activeCanvasAnnotations = this.canvasAnnotations[canvasIndex] ?? [];
+    this.#canvasSwitchPending = true;
+
+    if (this.containerElement) {
+      this.containerElement.dataset.loaded = "false";
+      this.containerElement.dataset.activeCanvas = canvasIndex.toString();
+    }
+
+    // The "open" handler takes care of points of interest and the viewport
+    this.viewer.open(this.#getTileSource(canvasIndex));
   }
 
   /**
@@ -418,6 +578,9 @@ export default class StoriiiesViewer {
    * Fetches from a URL if provided, otherwise uses the default SVG
    */
   async #setPointOfInterestSvg() {
+    // Already set (e.g. when returning to or moving between canvases)
+    if (this.pointOfInterestSvg) return;
+
     if (this.pointOfInterestSvgUrl) {
       try {
         const response = await fetch(this.pointOfInterestSvgUrl);
@@ -469,8 +632,14 @@ export default class StoriiiesViewer {
    * Rendering of points of interest on the viewer
    */
   async #renderPointsOfInterest() {
+    // The canvas may change while the SVG is loading
+    const canvasIndex = this.#_activeCanvasIndex;
+
     // Assign point of interest marker SVG
     await this.#setPointOfInterestSvg();
+
+    // Don't render markers for an image that's no longer being shown
+    if (canvasIndex !== this.#_activeCanvasIndex) return;
 
     // Extract POI data from annotations
     const poiData = this.activeCanvasAnnotations.map((annotation, index) => {
@@ -593,16 +762,18 @@ export default class StoriiiesViewer {
       marker.classList.remove("storiiies-viewer___poi-marker--active");
     });
 
+    const slide = this.#slides[this.#_activeSlideIndex];
+
     if (
-      this.activeAnnotationIndex >= 0 &&
-      this.activeAnnotationIndex < this.activeCanvasAnnotations.length &&
+      slide?.type === "annotation" &&
+      slide.annotationIndex < this.activeCanvasAnnotations.length &&
       this.#isPointOfInterestTarget(
-        this.activeCanvasAnnotations[this.activeAnnotationIndex].getTarget(),
+        this.activeCanvasAnnotations[slide.annotationIndex].getTarget(),
       )
     ) {
       const activeMarker = this.viewer.canvas.querySelector(
         '.storiiies-viewer__poi-marker[data-poi-index="' +
-          this.activeAnnotationIndex +
+          slide.annotationIndex +
           '"]',
       );
       if (activeMarker) {
@@ -634,8 +805,13 @@ export default class StoriiiesViewer {
 
     infoAreaWidth += infoInset;
 
+    // Space taken by the image previews, which sit on the opposite side to the info area
+    const thumbnailsWidth = this.thumbnailsElement
+      ? this.thumbnailsElement.offsetWidth + infoInset
+      : 0;
+
     const overlap = infoAreaWidth - halfViewerWidth;
-    const remainingSpace = viewerWidth - infoAreaWidth;
+    const remainingSpace = viewerWidth - infoAreaWidth - thumbnailsWidth;
     const poiButtonWidth = 44;
 
     // The new focal point becomes the centre of the remaining space
@@ -648,27 +824,22 @@ export default class StoriiiesViewer {
    * Update the viewer
    */
   #updateViewer() {
-    // Show whole image when showing the label
-    if (
-      this.label &&
-      this.activeAnnotationIndex === this.#annotationIndexFloor
-    ) {
+    const slide = this.#slides[this.#_activeSlideIndex];
+    if (!slide) return;
+
+    // Show whole image on the title slide, and when introducing an image
+    if (slide.type === "title" || slide.type === "canvas") {
       this.viewer.viewport.goHome(this.#prefersReducedMotion);
       return;
     }
 
     // Do nothing on the credit slide
-    if (
-      this.activeAnnotationIndex === this.#annotationIndexCeiling &&
-      this.showCreditSlide
-    ) {
+    if (slide.type === "credits") {
       return;
     }
 
     let target =
-      this.#getActiveCanvasAnnotations()[
-        this.activeAnnotationIndex
-      ].getTarget() || "";
+      this.activeCanvasAnnotations[slide.annotationIndex].getTarget() || "";
 
     // Flatten a point of interest into something the viewer can fit to the screen
     const isPointOfInterest = this.#isPointOfInterestTarget(target);
@@ -698,7 +869,7 @@ export default class StoriiiesViewer {
 
   /**
    * Get the active canvas index\
-   * Used to determine which canvas is currently active
+   * Used to determine which canvas (image) is currently active
    */
   get activeCanvasIndex(): number {
     return this.#_activeCanvasIndex;
@@ -706,35 +877,65 @@ export default class StoriiiesViewer {
 
   /**
    * Set the active canvas index and perform any necessary updates\
-   * Used to navigate between canvases
+   * Used to navigate between canvases, moving to the first slide for that canvas
    */
   set activeCanvasIndex(index: number) {
-    this.#_activeCanvasIndex = index;
-    this.activeAnnotationIndex = this.#annotationIndexFloor;
+    const slideIndex = this.#slides.findIndex(
+      (slide) => slide.canvasIndex === index,
+    );
+    if (slideIndex !== -1) {
+      this.activeSlideIndex = slideIndex;
+    }
   }
 
   /**
    * Get the active annotation index\
-   * Used to determine which annotation is currently active
+   * This is the position of the active annotation within the active canvas's annotations,
+   * or -1 if the active slide isn't an annotation (e.g. the title or credit slide)
    */
   get activeAnnotationIndex(): number {
-    return this.#_activeAnnotationIndex;
+    const slide = this.#slides[this.#_activeSlideIndex];
+    return slide?.type === "annotation" ? slide.annotationIndex : -1;
   }
 
   /**
-   * Set the active annotation index and perform any necessary updates\
+   * Set the active annotation index (within the active canvas) and perform any necessary updates\
    * Used to navigate between annotations
    */
   set activeAnnotationIndex(index: number) {
-    // Lower bound can only be -1 if there is a label
-    const lowerBound = this.#annotationIndexFloor;
-    const upperBound = this.#annotationIndexCeiling;
+    const slideIndex = this.#slides.findIndex(
+      (slide) =>
+        slide.type === "annotation" &&
+        slide.canvasIndex === this.#_activeCanvasIndex &&
+        slide.annotationIndex === index,
+    );
+    if (slideIndex !== -1) {
+      this.activeSlideIndex = slideIndex;
+    }
+  }
+
+  /**
+   * Get the active slide index\
+   * Slides are, in order: the title, each canvas's annotations, and the credits
+   */
+  get activeSlideIndex(): number {
+    return this.#_activeSlideIndex;
+  }
+
+  /**
+   * Set the active slide index and perform any necessary updates\
+   * Used to navigate between slides, switching images where needed
+   */
+  set activeSlideIndex(index: number) {
+    // Ignore out of bounds values
+    if (index < 0 || index >= this.#slides.length) return;
+
+    const lowerBound = 0;
+    const upperBound = this.#slides.length - 1;
+    const slide = this.#slides[index];
     let infoTextElementMarkup;
 
-    // Ignore out of bounds values
-    if (index < lowerBound || index > upperBound) return;
-
-    this.#_activeAnnotationIndex = index;
+    this.#_activeSlideIndex = index;
 
     // Reset button states
     this.controlButtonElements.prev.disabled = false;
@@ -751,23 +952,42 @@ export default class StoriiiesViewer {
       this.controlButtonElements.next.ariaLabel = "Restart";
     }
 
+    // Annotations need to be those of the new slide's canvas before rendering the text
+    const canvasChanged = slide.canvasIndex !== this.#_activeCanvasIndex;
+    if (canvasChanged) {
+      this.#_activeCanvasIndex = slide.canvasIndex;
+      this.activeCanvasAnnotations =
+        this.canvasAnnotations[slide.canvasIndex] ?? [];
+    }
+
     // Determine rendering method for info text area
-    if (this.activeAnnotationIndex === this.#annotationIndexFloor) {
-      infoTextElementMarkup = this.#creatTitleSlideMarkup();
-    } else if (
-      this.activeAnnotationIndex === this.#annotationIndexCeiling &&
-      this.showCreditSlide
-    ) {
-      infoTextElementMarkup = this.#createCreditSlideMarkup();
-    } else {
-      infoTextElementMarkup = this.#createAnnotationSlideMarkup();
+    switch (slide.type) {
+      case "title":
+        infoTextElementMarkup = this.#creatTitleSlideMarkup();
+        break;
+      case "canvas":
+        infoTextElementMarkup = this.#createCanvasSlideMarkup(
+          slide.canvasIndex,
+        );
+        break;
+      case "credits":
+        infoTextElementMarkup = this.#createCreditSlideMarkup();
+        break;
+      default:
+        infoTextElementMarkup = this.#createAnnotationSlideMarkup();
     }
 
     this.infoTextElement.innerHTML = infoTextElementMarkup;
 
-    this.#updatePointOfInterestMarkers();
+    this.#updateThumbnails();
 
-    this.#updateViewer();
+    if (canvasChanged) {
+      // Swap the image. Markers and viewport are updated when it has loaded
+      this.#openCanvas(slide.canvasIndex);
+    } else {
+      this.#updatePointOfInterestMarkers();
+      this.#updateViewer();
+    }
   }
 
   /**
@@ -830,12 +1050,13 @@ export default class StoriiiesViewer {
     [prevButtonEl, nextButtonEl].forEach((button) => {
       button.addEventListener("click", (e) => {
         if ((e.target as HTMLButtonElement).ariaLabel === "Previous") {
-          this.activeAnnotationIndex = this.activeAnnotationIndex - 1;
+          this.activeSlideIndex = this.activeSlideIndex - 1;
         } else {
-          if (this.activeAnnotationIndex === this.#annotationIndexCeiling) {
-            this.activeCanvasIndex = 0;
+          if (this.activeSlideIndex === this.#slides.length - 1) {
+            // Restart
+            this.activeSlideIndex = 0;
           } else {
-            this.activeAnnotationIndex = this.activeAnnotationIndex + 1;
+            this.activeSlideIndex = this.activeSlideIndex + 1;
           }
         }
       });
@@ -883,9 +1104,116 @@ export default class StoriiiesViewer {
     };
     this.infoToggleElement = infoToggleEl;
 
+    this.#insertThumbnails();
+
     // Initialise values, let the setters handle the rest
     this.showInfoArea = true;
-    this.activeAnnotationIndex = this.#annotationIndexFloor;
+    this.activeSlideIndex = 0;
+  }
+
+  /**
+   * Get the URL of an image to use as a preview of a canvas\
+   * Uses the canvas's own thumbnail if it has one, otherwise asks its image service for a suitable size
+   */
+  async #getThumbnailUrl(canvasIndex: number): Promise<string | undefined> {
+    const canvas = this.canvases[canvasIndex];
+
+    const provided = getCanvasThumbnailUrl({
+      thumbnail: canvas.getProperty("thumbnail"),
+    });
+    if (provided) return this.#resolveUrl(provided);
+
+    const serviceId = this.#getImageServiceId(canvas);
+    if (!serviceId) return undefined;
+
+    // Level 0 image services only deliver the sizes they list in their info.json
+    let width = THUMBNAIL_TARGET_WIDTH;
+    try {
+      const response = await fetch(this.#expandServiceID(serviceId));
+      if (response.ok) {
+        const info = await response.json();
+        width = chooseImageSize(info?.sizes, width) ?? width;
+      }
+    } catch (e) {
+      // Ignore, and ask for the target width anyway
+    }
+
+    return buildImageUrl(serviceId, width);
+  }
+
+  /**
+   * Create the previews of each image, used to jump between them\
+   * Only needed when there's more than one image
+   */
+  #insertThumbnails() {
+    if (!this.showThumbnails || this.canvases.length < 2) return;
+
+    const thumbnailsEl = document.createElement("nav");
+    thumbnailsEl.id = `storiiies-viewer-${this.instanceId}__thumbnails`;
+    thumbnailsEl.classList.add("storiiies-viewer__thumbnails");
+    thumbnailsEl.ariaLabel = "Images";
+
+    this.canvases.forEach((_, canvasIndex) => {
+      const label = this.#getCanvasLabel(canvasIndex);
+      const position = `Image ${canvasIndex + 1} of ${this.canvases.length}`;
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.classList.add("storiiies-viewer__thumbnail");
+      button.dataset.canvasIndex = canvasIndex.toString();
+      button.ariaLabel = label ? `${position}: ${label}` : position;
+      button.title = label || `Image ${canvasIndex + 1}`;
+
+      // Jump to the start of that image's part of the story
+      button.addEventListener("click", () => {
+        this.activeCanvasIndex = canvasIndex;
+      });
+
+      thumbnailsEl.append(button);
+
+      // The image itself can arrive whenever. The button works without it
+      this.#getThumbnailUrl(canvasIndex).then((url) => {
+        if (!url) return;
+        const img = document.createElement("img");
+        // The button is already labelled
+        img.alt = "";
+        img.draggable = false;
+        img.src = url;
+        button.append(img);
+      });
+    });
+
+    this.containerElement?.insertAdjacentElement("beforeend", thumbnailsEl);
+    this.thumbnailsElement = thumbnailsEl;
+  }
+
+  /**
+   * Mark the preview of the active image, and scroll it into view in the list
+   */
+  #updateThumbnails() {
+    const thumbnailsEl = this.thumbnailsElement;
+    if (!thumbnailsEl) return;
+
+    thumbnailsEl
+      .querySelectorAll<HTMLButtonElement>(".storiiies-viewer__thumbnail")
+      .forEach((button) => {
+        const isActive =
+          button.dataset.canvasIndex === this.#_activeCanvasIndex.toString();
+
+        if (isActive) {
+          button.setAttribute("aria-current", "true");
+
+          // Scroll the list itself, rather than scrollIntoView which could also scroll the page
+          thumbnailsEl.scrollTo({
+            top:
+              button.offsetTop -
+              (thumbnailsEl.clientHeight - button.offsetHeight) / 2,
+            behavior: this.#prefersReducedMotion ? "auto" : "smooth",
+          });
+        } else {
+          button.removeAttribute("aria-current");
+        }
+      });
   }
 
   /**
@@ -926,12 +1254,28 @@ export default class StoriiiesViewer {
   }
 
   /**
+   * Generate HTML markup for the slide introducing an image after the first
+   */
+  #createCanvasSlideMarkup(canvasIndex: number): string {
+    // Label should always be plain text
+    const labelHTML = sanitiseHTML(
+      nl2br(this.#getCanvasLabel(canvasIndex) || `Image ${canvasIndex + 1}`),
+      this.DOMPurifyConfig,
+    );
+
+    return `<h2 class="storiiies-viewer__title storiiies-viewer__text-section">${labelHTML}</h2>`;
+  }
+
+  /**
    * Generate HTML markup for an annotation slide
    */
   #createAnnotationSlideMarkup(): string {
     let markup = "";
+    const slide = this.#slides[this.#_activeSlideIndex];
     const activeAnnotation =
-      this.activeCanvasAnnotations[this.#_activeAnnotationIndex].getBody();
+      slide.type === "annotation"
+        ? this.activeCanvasAnnotations[slide.annotationIndex].getBody()
+        : [];
 
     // getBody will always return AnnotationBody[]
     for (const body of activeAnnotation) {
@@ -970,65 +1314,109 @@ export default class StoriiiesViewer {
    */
   #createCreditSlideMarkup(): string {
     // No need to sanitise this hardcoded markup
-    return `<div class="storiiies-viewer__text-section"><p>You've reached the end.</p></div>`;
-
-    //return `<div class="storiiies-viewer__text-section"><p>Storiiies was created by <a href="https://www.cogapp.com" target="_blank">Cogapp</a>.</p><p>It's easy, and free, to create your own story - find out more at <a href="https://www.cogapp.com/storiiies" target="_blank">cogapp.com/storiiies</a>.</p><p>This viewer is released as open source - see <a href="https://cogapp.com/open-source-at-cogapp" target="_blank">cogapp.com/open-source-at-cogapp</a>.</p></div>`;
+    return `<div class="storiiies-viewer__text-section"><p>Storiiies was created by <a href="https://www.cogapp.com" target="_blank">Cogapp</a>.</p><p>It's easy, and free, to create your own story - find out more at <a href="https://www.cogapp.com/storiiies" target="_blank">cogapp.com/storiiies</a>.</p><p>This viewer is released as open source - see <a href="https://cogapp.com/open-source-at-cogapp" target="_blank">cogapp.com/open-source-at-cogapp</a>.</p></div>`;
   }
 
   /**
-   * Retrieves the annotationPages for the manifest
+   * Resolve a URL found in the manifest relative to the manifest's own URL
+   */
+  #resolveUrl(url: string): string {
+    try {
+      return new URL(url, new URL(this.manifestUrl, document.baseURI).href)
+        .href;
+    } catch (e) {
+      return url;
+    }
+  }
+
+  /**
+   * Fetch an externally referenced annotation page (v3) or annotation list (v2)\
+   * Resolves to its annotations, or an empty array (with a warning) if it can't be used
+   */
+  async #fetchAnnotations(url: string): Promise<RawAnnotation[]> {
+    try {
+      const response = await fetch(this.#resolveUrl(url));
+      if (!response.ok) {
+        throw new Error(`Failed to fetch annotations: ${response.statusText}`);
+      }
+      const annotations = getAnnotationsFromPage(await response.json());
+      if (!annotations) {
+        throw new Error("Fetched content is not an annotation page");
+      }
+      return annotations;
+    } catch (e) {
+      this.#logger("ext-anno-err");
+      return [];
+    }
+  }
+
+  /**
+   * Retrieves the annotations for each canvas in the manifest\
+   * Handles v3 `annotations` and v2 `otherContent`, whether embedded or referenced externally.
+   * Populates `canvasAnnotations` (annotations per canvas) and `annotationPages` (all pages)\
    * (Temporary solution)
    */
-  #getAnnotationPages(): Array<AnnotationPage> {
-    const annotationPages: Array<AnnotationPage> = [];
-
-    if (this.canvases.length) {
-      this.canvases.forEach((canvas) => {
+  async #loadAnnotations() {
+    const pagesPerCanvas = await Promise.all(
+      this.canvases.map((canvas) => {
         // "getProperty" ejects and results in raw JSON
         // We need to instantiate each level with the appropriate constructor
-        const rawAnnotationPages: Array<RawAnnotationPage> =
-          canvas.getProperty("annotations") || [];
+        const rawPages = getCanvasAnnotationPages({
+          annotations: canvas.getProperty("annotations"),
+          otherContent: canvas.getProperty("otherContent"),
+        });
 
-        annotationPages.push(
-          ...rawAnnotationPages.flatMap((rawAnnotationPage) => {
-            const rawAnnotations: Array<RawAnnotation> | undefined =
-              rawAnnotationPage.items;
-
-            // Remove page if annotations aren't embedded
-            if (!rawAnnotations) {
-              this.#logger("no-ext-anno");
-              return [];
-            }
-
-            return new AnnotationPage(
-              {
-                ...rawAnnotationPage,
-                items: rawAnnotations.map((rawAnnotation) => {
-                  return new Annotation(rawAnnotation, this.manifest.options);
-                }),
-                type: rawAnnotationPage.type,
-              },
-              this.manifest.options,
-            );
-          }),
+        // Pages for a canvas are loaded in parallel, and kept in manifest order
+        return Promise.all(
+          rawPages.map((rawPage) => this.#createAnnotationPage(rawPage)),
         );
-        return [];
-      });
-    }
-    return annotationPages;
-  }
+      }),
+    );
 
-  /**
-   * Get the annotations for the current canvas
-   */
-  #getActiveCanvasAnnotations(): Array<Annotation> {
-    // The current canvas might not have any annotations
-    // TODO: Deprecation warning from manifesto.js
+    this.annotationPages = pagesPerCanvas.flat();
+
+    // A canvas might have several annotationPages, which are shown in order
+    // TODO: Deprecation warning from manifesto.js on getItems
     // but switching to getAnnotations seems to break methods down the chain.
     // This needs investigating further, but strongly suspect it's
     // related to the temporary way we retrieve annotationPages.
     // This has been patched in manifesto and can be updated.
-    return this.annotationPages[this.activeCanvasIndex]?.getItems() || [];
+    this.canvasAnnotations = pagesPerCanvas.map((pages) =>
+      pages.flatMap((page) => page.getItems() || []),
+    );
+  }
+
+  /**
+   * Build an AnnotationPage from a raw v3 annotationPage or v2 annotation list\
+   * Fetches it first if it's only a reference
+   */
+  async #createAnnotationPage(rawPage: unknown): Promise<AnnotationPage> {
+    const url = getPageUrl(rawPage);
+    const embedded = getAnnotationsFromPage(rawPage);
+    let rawAnnotations: RawAnnotation[];
+
+    if (embedded) {
+      // Embedded annotations are used as they are
+      rawAnnotations = embedded;
+    } else if (url) {
+      // Otherwise the page is only a reference
+      rawAnnotations = await this.#fetchAnnotations(url);
+    } else {
+      this.#logger("ext-anno-err");
+      rawAnnotations = [];
+    }
+
+    return new AnnotationPage(
+      {
+        id: url ?? "",
+        type: "AnnotationPage",
+        items: rawAnnotations.map(
+          (rawAnnotation) =>
+            new Annotation(rawAnnotation, this.manifest.options),
+        ),
+      },
+      this.manifest.options,
+    );
   }
 
   /**
