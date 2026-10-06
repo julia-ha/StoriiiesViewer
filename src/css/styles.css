@@ -29,6 +29,8 @@
   --storiiies-viewer-title-line-height: 1.2;
   --storiiies-viewer-transition-speed: 400ms;
   --storiiies-viewer-scroll-size: 8px;
+  --storiiies-viewer-thumbnail-size: 72px;
+  --storiiies-viewer-thumbnail-gap: 8px;
 
   position: relative;
   inline-size: 100%;
@@ -207,6 +209,67 @@
 }
 
 /*
+* ## Image previews
+* Only present when there's more than one image
+*/
+.storiiies-viewer__thumbnails {
+  position: absolute;
+  inset-block-start: calc(var(--storiiies-viewer-outer-spacing) - 6px);
+  inset-inline-end: calc(var(--storiiies-viewer-outer-spacing) - 6px);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--storiiies-viewer-thumbnail-gap);
+  max-block-size: calc(50cqb - var(--storiiies-viewer-outer-spacing) * 2 + 12px);
+  /* Room for the rings around the previews, which would otherwise be clipped */
+  padding: 6px;
+  overflow-y: auto;
+  /* Sits on top of the image, so needs to work on dark and light backgrounds */
+  scrollbar-color: var(--storiiies-viewer-bg) transparent;
+  scrollbar-width: thin;
+  /* Let the gaps between previews pass through to the image */
+  pointer-events: none;
+}
+
+.storiiies-viewer--info-hidden .storiiies-viewer__thumbnails {
+  max-block-size: calc(100cqb - var(--storiiies-viewer-outer-spacing) * 2 + 12px);
+}
+
+.storiiies-viewer__thumbnail {
+  display: block;
+  flex: none;
+  inline-size: var(--storiiies-viewer-thumbnail-size);
+  block-size: var(--storiiies-viewer-thumbnail-size);
+  padding: 0;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+  background: var(--storiiies-viewer-button-bg);
+  border: none;
+  border-radius: 4px;
+  /* Dimmed and with a faint edge until it's the current image, hovered or focused */
+  opacity: 0.65;
+  box-shadow: 0 0 0 1px hsl(0deg 0% 100% / 50%);
+  transition: opacity 100ms;
+}
+
+.storiiies-viewer__thumbnail img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.storiiies-viewer__thumbnail:focus-visible,
+.storiiies-viewer__thumbnail:hover,
+.storiiies-viewer__thumbnail[aria-current="true"] {
+  opacity: 1;
+  outline: 2px solid var(--storiiies-viewer-accent-inner);
+  box-shadow: 0 0 0 4px var(--storiiies-viewer-accent-outer);
+}
+
+/*
 * ## Points of Interest markers
 */
 .storiiies-viewer__poi-marker {
@@ -243,9 +306,22 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .storiiies-viewer__thumbnail {
+    transition: none;
+  }
+}
+
 /*
 * ## Container queries
 */
+@container storiiies-viewer (max-inline-size: 639px) {
+  .storiiies-viewer__thumbnail {
+    inline-size: calc(var(--storiiies-viewer-thumbnail-size) * 0.75);
+    block-size: calc(var(--storiiies-viewer-thumbnail-size) * 0.75);
+  }
+}
+
 @container storiiies-viewer (min-inline-size: 640px) {
   .storiiies-viewer__osd-container {
     inline-size: 100cqi;
@@ -272,6 +348,10 @@
   .storiiies-viewer__info-area--hidden {
     translate: -88px 0;
   }
+
+  .storiiies-viewer__thumbnails {
+    max-block-size: calc(100cqb - var(--storiiies-viewer-outer-spacing) * 2 + 12px);
+  }
 }
 
 /*
@@ -297,5 +377,13 @@
 
   .storiiies-viewer__info-text {
     max-block-size: calc(100% - var(--storiiies-viewer-outer-spacing) * 2 - 44px);
+  }
+
+  .storiiies-viewer__thumbnails {
+    max-block-size: calc(50% - var(--storiiies-viewer-outer-spacing) * 2 + 12px);
+  }
+
+  .storiiies-viewer--info-hidden .storiiies-viewer__thumbnails {
+    max-block-size: calc(100% - var(--storiiies-viewer-outer-spacing) * 2 + 12px);
   }
 }
