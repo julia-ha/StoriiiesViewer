@@ -1,0 +1,191 @@
+{
+  "@context": "http://iiif.io/api/presentation/3/context.json",
+  "id": "http://localhost:43110/manifests/multiple-images-v3/manifest.json",
+  "type": "Manifest",
+  "label": {
+    "en": [
+      "A story with multiple images"
+    ]
+  },
+  "summary": {
+    "en": [
+      "Three images, each with their own annotations."
+    ]
+  },
+  "items": [
+    {
+      "id": "http://localhost:43110/images/exact-tiles/canvases/1",
+      "type": "Canvas",
+      "height": 2048,
+      "width": 2048,
+      "items": [
+        {
+          "id": "http://localhost:43110/images/exact-tiles/pages/1",
+          "type": "AnnotationPage",
+          "items": [
+            {
+              "id": "http://localhost:43110/images/exact-tiles/annotations/1",
+              "type": "Annotation",
+              "motivation": "painting",
+              "body": {
+                "id": "http://localhost:43110/images/exact-tiles/full/full/0/default.jpg",
+                "type": "Image",
+                "format": "image/jpeg",
+                "height": 2048,
+                "width": 2048,
+                "service": [
+                  {
+                    "id": "http://localhost:43110/images/exact-tiles",
+                    "profile": "level0",
+                    "type": "ImageService3"
+                  }
+                ]
+              },
+              "target": "http://localhost:43110/images/exact-tiles/canvases/1"
+            }
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "id": "http://localhost:43110/annotations/multiple-images-v3/canvas-1",
+          "type": "AnnotationPage",
+          "items": [
+            {
+              "id": "http://localhost:43110/annotations/multiple-images-v3/canvas-1/annotation/1",
+              "type": "Annotation",
+              "motivation": "commenting",
+              "body": {
+                "type": "TextualBody",
+                "value": "First image, region annotation",
+                "language": "en",
+                "format": "text/plain"
+              },
+              "target": "http://localhost:43110/images/exact-tiles/canvases/1#xywh=265,661,100,200"
+            },
+            {
+              "id": "http://localhost:43110/annotations/multiple-images-v3/canvas-1/annotation/2",
+              "type": "Annotation",
+              "motivation": "commenting",
+              "body": {
+                "type": "TextualBody",
+                "value": "First image, point of interest",
+                "language": "en",
+                "format": "text/plain"
+              },
+              "target": {
+                "type": "SpecificResource",
+                "source": "http://localhost:43110/images/exact-tiles/canvases/1",
+                "selector": {
+                  "type": "PointSelector",
+                  "x": 512,
+                  "y": 512
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "http://localhost:43110/images/tractor/canvases/1",
+      "type": "Canvas",
+      "height": 3023,
+      "width": 4031,
+      "label": {
+        "en": [
+          "Second image"
+        ]
+      },
+      "items": [
+        {
+          "id": "http://localhost:43110/images/tractor/pages/2",
+          "type": "AnnotationPage",
+          "items": [
+            {
+              "id": "http://localhost:43110/images/tractor/annotations/2",
+              "type": "Annotation",
+              "motivation": "painting",
+              "body": {
+                "id": "http://localhost:43110/images/tractor/full/full/0/default.jpg",
+                "type": "Image",
+                "format": "image/jpeg",
+                "height": 3023,
+                "width": 4031,
+                "service": [
+                  {
+                    "id": "http://localhost:43110/images/tractor",
+                    "profile": "level0",
+                    "type": "ImageService3"
+                  }
+                ]
+              },
+              "target": "http://localhost:43110/images/tractor/canvases/1"
+            }
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "id": "http://localhost:43110/annotations/multiple-images-v3/canvas-2",
+          "type": "AnnotationPage",
+          "items": [
+            {
+              "id": "http://localhost:43110/annotations/multiple-images-v3/canvas-2/annotation/1",
+              "type": "Annotation",
+              "motivation": "commenting",
+              "body": {
+                "type": "TextualBody",
+                "value": "Second image, region annotation",
+                "language": "en",
+                "format": "text/plain"
+              },
+              "target": "http://localhost:43110/images/tractor/canvases/1#xywh=1000,800,800,600"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "http://localhost:43110/images/exact-tiles/canvases/2",
+      "type": "Canvas",
+      "height": 2048,
+      "width": 2048,
+      "items": [
+        {
+          "id": "http://localhost:43110/images/exact-tiles/pages/3",
+          "type": "AnnotationPage",
+          "items": [
+            {
+              "id": "http://localhost:43110/images/exact-tiles/annotations/3",
+              "type": "Annotation",
+              "motivation": "painting",
+              "body": {
+                "id": "http://localhost:43110/images/exact-tiles/full/full/0/default.jpg",
+                "type": "Image",
+                "format": "image/jpeg",
+                "height": 2048,
+                "width": 2048,
+                "service": [
+                  {
+                    "id": "http://localhost:43110/images/exact-tiles",
+                    "profile": "level0",
+                    "type": "ImageService3"
+                  }
+                ]
+              },
+              "target": "http://localhost:43110/images/exact-tiles/canvases/2"
+            }
+          ]
+        }
+      ],
+      "thumbnail": [
+        {
+          "id": "http://localhost:43110/images/exact-tiles/full/128,/0/default.jpg",
+          "type": "Image",
+          "format": "image/jpeg"
+        }
+      ]
+    }
+  ]
+}
