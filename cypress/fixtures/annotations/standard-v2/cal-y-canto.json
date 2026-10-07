@@ -1,0 +1,29 @@
+{
+  "@context": "http://iiif.io/api/presentation/2/context.json",
+  "@id": "http://localhost:43110/annotations/standard-v2/cal-y-canto.json",
+  "@type": "sc:AnnotationList",
+  "resources": [
+	{
+		"@type": "oa:Annotation",
+		"@id": "https://dev.gdmrdigital.com/annotation/anno/1791381444531",
+		"motivation": "sc:painting",
+		"resource": {
+		  "@type": "cnt:ContentAsText",
+		  "format": "text/plain",
+		  "chars": "For Olga de Amaral, the rugged landscape of the Andes is deeply linked with her Colombian identity. Her woven walls assertively claim the space they inhabit. Her unique style is influenced by her early education in architecture, ancient American weaving traditions, and experimental techniques. Weaving, in the artist's view, is a way of building one's way of life."
+		},
+		"on": "https://ids.si.edu/ids/manifest/SAAM-1991.109_1/canvas/c0/#xywh=737,1031,1179,1046"
+	},
+    {
+      "@type": "oa:Annotation",
+      "@id": "https://dev.gdmrdigital.com/annotation/anno/1791381506991",
+      "motivation": "sc:painting",
+      "resource": {
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "\"The weaving tradition--at least in Latin America--seems inseparable from the concept of sacred landscape . . . one must ask what landscape is inhabited by the weavers.\"</br> --Olga de Amaral"
+      },
+      "on": "https://ids.si.edu/ids/manifest/SAAM-1991.109_1/canvas/c0/#xywh=1410,1401,447,352"
+    }
+  ]
+}
