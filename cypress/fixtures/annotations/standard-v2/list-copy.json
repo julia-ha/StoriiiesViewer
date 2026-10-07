@@ -1,0 +1,40 @@
+{
+  "@context": "http://iiif.io/api/presentation/2/context.json",
+  "@id": "http://localhost:43110/annotations/standard-v2/list-copy.json",
+  "@type": "sc:AnnotationList",
+  "resources": [
+	{
+		"@type": "oa:Annotation",
+		"@id": "8d4b542f2bea4587b392803665559310",
+		"motivation": "sc:painting",
+		"resource": {
+		  "@type": "cnt:ContentAsText",
+		  "format": "text/plain",
+		  "chars": "Face of Mary"
+		},
+		"on": "https://ids.si.edu/ids/iiif/canvas-CHSDM-B3F79179F6E22-000001/canvas/c0/#xywh=1554,866,1796,1761"
+	},
+    {
+      "@type": "oa:Annotation",
+      "@id": "456b724b273541b4a90303b82b9084bb",
+      "motivation": "sc:painting",
+      "resource": {
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "Figure 1"
+      },
+      "on": "https://ids.si.edu/ids/manifest/CHSDM-B3F79179F6E22-000001/canvas/c0/#xywh=3569,3549,1129,1185"
+    },
+    {
+      "@type": "oa:Annotation",
+      "@id": "fb71a8fe693e43198462083770213b95",
+      "motivation": "sc:painting",
+      "resource": {
+        "@type": "cnt:ContentAsText",
+        "format": "text/plain",
+        "chars": "Figure 2"
+      },
+      "on": "https://ids.si.edu/ids/manifest/CHSDM-B3F79179F6E22-000001/canvas/c0/#xywh=512,3817,419,673"
+    }
+  ]
+}

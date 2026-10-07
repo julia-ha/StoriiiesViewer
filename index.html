@@ -15,9 +15,13 @@
       import StoriiiesViewer from "/src/StoriiiesViewer.ts";
       document.addEventListener("DOMContentLoaded", () => {
         const container = document.querySelector("#viewer");
+		
 
         window.storiiiesViewerInstance = new StoriiiesViewer({
           container,
+		  showLandingPage: true,
+		landingPageEyebrow: "Exhibit",          // optional, "" for none
+		landingPageButtonLabel: "Start Exhibit",
           manifestUrl:
             "http://localhost:43110/manifests/embedded-v2/manifest.json",
         });

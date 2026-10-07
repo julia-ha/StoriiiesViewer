@@ -2,14 +2,14 @@
   "@context": "http://iiif.io/api/presentation/2/context.json",
   "@id": "http://localhost:43110/manifests/embedded-v2/manifest.json",
   "@type": "sc:Manifest",
-  "label": "Embedded v2 manifest",
+  "label": "Olga de Amaral",
   "description": [
     {
-      "@value": "An embedded v2 description",
+      "@value": "Discover the works of Olga de Amaral with this interactive image viewer",
       "@language": "en"
     }
   ],
-  "attribution": "Courtesy of Example Institution",
+  "attribution": "Cooper Hewitt, Smithsonian Design Museum",
   "sequences": [
     {
       "@type": "sc:Sequence",
@@ -17,7 +17,35 @@
 		{
 			"@id": "https://ids.si.edu/ids/iiif/canvas-SAAM-1991.109_1",
 			"@type": "sc:Canvas",
-			"label": "image SAAM-1991.109_1",
+			"label": "Cal y Canto",
+			"height": 3000,
+			"width": 2102,
+			"images": [
+				{
+				"@context": "http://iiif.io/api/presentation/2/context.json",
+				"@id": "https://ids.si.edu/ids/iiif/SAAM-1991.109_1",
+				"@type": "oa:Annotation",
+				"motivation": "sc:painting",
+				"resource": {
+					"@id": "https://ids.si.edu/ids/iiif/SAAM-1991.109_1/full/full/0/default.jpg",
+					"@type": "dctypes:Image",
+					"height": 3000,
+					"width": 2102,
+					"format": "image/jpeg",
+					"service": {
+					"@context": "http://iiif.io/api/image/2/context.json",
+					"@id": "https://ids.si.edu/ids/iiif/SAAM-1991.109_1",
+					"profile": "http://iiif.io/api/image/2/level2.json"
+						}
+					},
+				"on": "https://ids.si.edu/ids/iiif/SAAM-1991.109_1"
+			    }
+			]
+		},
+		{
+			"@id": "https://ids.si.edu/ids/iiif/canvas-SAAM-1991.109_1",
+			"@type": "sc:Canvas",
+			"label": "Cal y Canto",
 			"height": 3000,
 			"width": 2102,
 			"images": [
@@ -45,7 +73,8 @@
 		{
 			"@id": "https://ids.si.edu/ids/iiif/canvas-CHSDM-B3F79179F6E22-000001",
 			"@type": "sc:Canvas",
-			"label": "image CHSDM-B3F79179F6E22-000001",
+			"label": "Fragments",
+			"attribution": "Cooper Hewitt, Smithsonian Design Museum",
 			"height": 6400,
 			"width": 4836,
 			"images": [
@@ -72,7 +101,7 @@
 			"otherContent": [
 				{
 				"@type": "sc:AnnotationList",
-				"@id": "http://localhost:43111/annotations/standard-v2/list-copy.json",
+				"@id": "http://localhost:43110/annotations/standard-v2/list-copy.json",
 				"label": "Annotations for canvas image CHSDM-B3F79179F6E22-000001"
 				}
 			]
@@ -81,7 +110,7 @@
 		  {
 			"@id": "https://ids.si.edu/ids/iiif/canvas-CHSDM-D5A50F69BF6D2_01-000001",
 			"@type": "sc:Canvas",
-			"label": "image CHSDM-D5A50F69BF6D2_01-000001",
+			"label": "Man's waistcoat",
 			"height": 7040,
 			"width": 5826,
 			"images": [
@@ -107,6 +136,118 @@
 			]
 		  },
 
+		  {
+			"@id": "https://ids.si.edu/ids/iiif/canvas-CHSDM-1941-69-152MattFlynn",
+			"@type": "sc:Canvas",
+			"label": "Embroidered Sampler, Mary Hallowell",
+			"height": 2877,
+			"width": 3000,
+			"images": [
+			  {
+				"@context": "http://iiif.io/api/presentation/2/context.json",
+				"@id": "https://ids.si.edu/ids/iiif/CHSDM-1941-69-152MattFlynn",
+				"@type": "oa:Annotation",
+				"motivation": "sc:painting",
+				"resource": {
+				  "@id": "https://ids.si.edu/ids/iiif/CHSDM-1941-69-152MattFlynn/full/full/0/default.jpg",
+				  "@type": "dctypes:Image",
+				  "height": 2877,
+				  "width": 3000,
+				  "format": "image/jpeg",
+				  "service": {
+					"@context": "http://iiif.io/api/image/2/context.json",
+					"@id": "https://ids.si.edu/ids/iiif/CHSDM-1941-69-152MattFlynn",
+					"profile": "http://iiif.io/api/image/2/level2.json"
+				  }
+				},
+				"on": "https://ids.si.edu/ids/iiif/CHSDM-1941-69-152MattFlynn"
+			  }
+			]
+		  },
+		  {
+			"@id": "https://ids.si.edu/ids/iiif/canvas-CHSDM-1945-39-4-bMattFlynn",
+			"@type": "sc:Canvas",
+			"label": "Fragment",
+			"height": 3000,
+			"width": 3000,
+			"images": [
+			  {
+				"@context": "http://iiif.io/api/presentation/2/context.json",
+				"@id": "https://ids.si.edu/ids/iiif/CHSDM-1945-39-4-bMattFlynn",
+				"@type": "oa:Annotation",
+				"motivation": "sc:painting",
+				"resource": {
+				  "@id": "https://ids.si.edu/ids/iiif/CHSDM-1945-39-4-bMattFlynn/full/full/0/default.jpg",
+				  "@type": "dctypes:Image",
+				  "height": 3000,
+				  "width": 3000,
+				  "format": "image/jpeg",
+				  "service": {
+					"@context": "http://iiif.io/api/image/2/context.json",
+					"@id": "https://ids.si.edu/ids/iiif/CHSDM-1945-39-4-bMattFlynn",
+					"profile": "http://iiif.io/api/image/2/level2.json"
+				  }
+				},
+				"on": "https://ids.si.edu/ids/iiif/CHSDM-1945-39-4-bMattFlynn"
+			  }
+			]
+		  },
+		  {
+			"@id": "https://ids.si.edu/ids/iiif/canvas-CHSDM-75386_01-000001",
+			"@type": "sc:Canvas",
+			"label": "Embroidered Sampler, Mary Greene",
+			"height": 5760,
+			"width": 4097,
+			"images": [
+			  {
+				"@context": "http://iiif.io/api/presentation/2/context.json",
+				"@id": "https://ids.si.edu/ids/iiif/CHSDM-75386_01-000001",
+				"@type": "oa:Annotation",
+				"motivation": "sc:painting",
+				"resource": {
+				  "@id": "https://ids.si.edu/ids/iiif/CHSDM-75386_01-000001/full/full/0/default.jpg",
+				  "@type": "dctypes:Image",
+				  "height": 5760,
+				  "width": 4097,
+				  "format": "image/jpeg",
+				  "service": {
+					"@context": "http://iiif.io/api/image/2/context.json",
+					"@id": "https://ids.si.edu/ids/iiif/CHSDM-75386_01-000001",
+					"profile": "http://iiif.io/api/image/2/level2.json"
+				  }
+				},
+				"on": "https://ids.si.edu/ids/iiif/CHSDM-75386_01-000001"
+			  }
+			]
+		  },
+		  {
+			"@id": "https://ids.si.edu/ids/iiif/canvas-CHSDM-1941-69-79MattFlynn",
+			"@type": "sc:Canvas",
+			"label": "Embroidered Sampler, Mary Richards",
+			"height": 2963,
+			"width": 3000,
+			"images": [
+			  {
+				"@context": "http://iiif.io/api/presentation/2/context.json",
+				"@id": "https://ids.si.edu/ids/iiif/CHSDM-1941-69-79MattFlynn",
+				"@type": "oa:Annotation",
+				"motivation": "sc:painting",
+				"resource": {
+				  "@id": "https://ids.si.edu/ids/iiif/CHSDM-1941-69-79MattFlynn/full/full/0/default.jpg",
+				  "@type": "dctypes:Image",
+				  "height": 2963,
+				  "width": 3000,
+				  "format": "image/jpeg",
+				  "service": {
+					"@context": "http://iiif.io/api/image/2/context.json",
+					"@id": "https://ids.si.edu/ids/iiif/CHSDM-1941-69-79MattFlynn",
+					"profile": "http://iiif.io/api/image/2/level2.json"
+				  }
+				},
+				"on": "https://ids.si.edu/ids/iiif/CHSDM-1941-69-79MattFlynn"
+			  }
+			]
+		  },
         {
           "@id": "http://localhost:43110/images/exact-tiles/canvas/v2-1",
           "@type": "sc:Canvas",

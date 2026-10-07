@@ -463,6 +463,40 @@ export default class StoriiiesViewer {
   }
 
   /**
+   * Get the description of a manifest or canvas as plain text
+   */
+  #getDescription(resource: Manifest | Canvas): string {
+    try {
+      // A lone v2 style { "@value", "@language" } object isn't something every
+      // language map parser copes with, so read those directly
+      const rawLabel = resource.getProperty("description");
+      if (isSingleV2Value(rawLabel)) {
+        return iiifValueToString(rawLabel);
+      }
+      return resource.getLabel().getValue() || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  /**
+   * Get the description of a manifest or canvas as plain text
+   */
+  #getAttribution(resource: Manifest | Canvas): string {
+    try {
+      // A lone v2 style { "@value", "@language" } object isn't something every
+      // language map parser copes with, so read those directly
+      const rawLabel = resource.getProperty("attribution");
+      if (isSingleV2Value(rawLabel)) {
+        return iiifValueToString(rawLabel);
+      }
+      return resource.getLabel().getValue() || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  /**
    * Get the id of the IIIF image service for a canvas\
    * Falls back to reading v2 canvases directly
    */
@@ -1452,7 +1486,8 @@ export default class StoriiiesViewer {
    */
   #createCreditSlideMarkup(): string {
     // No need to sanitise this hardcoded markup
-    return `<div class="storiiies-viewer__text-section"><p>Storiiies was created by <a href="https://www.cogapp.com" target="_blank">Cogapp</a>.</p><p>It's easy, and free, to create your own story - find out more at <a href="https://www.cogapp.com/storiiies" target="_blank">cogapp.com/storiiies</a>.</p><p>This viewer is released as open source - see <a href="https://cogapp.com/open-source-at-cogapp" target="_blank">cogapp.com/open-source-at-cogapp</a>.</p></div>`;
+    return `<div class="storiiies-viewer__text-section"><p>View more programming and resources about this exhibit at <a href="https://www.cooperhewitt.org" target="_blank">cooperhewitt.org</a>.</p></div>`;
+    //return `<div class="storiiies-viewer__text-section"><p>Storiiies was created by <a href="https://www.cogapp.com" target="_blank">Cogapp</a>.</p><p>It's easy, and free, to create your own story - find out more at <a href="https://www.cogapp.com/storiiies" target="_blank">cogapp.com/storiiies</a>.</p><p>This viewer is released as open source - see <a href="https://cogapp.com/open-source-at-cogapp" target="_blank">cogapp.com/open-source-at-cogapp</a>.</p></div>`;
   }
 
   /**
